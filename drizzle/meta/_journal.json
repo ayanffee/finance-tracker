@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1773711929058,
+      "tag": "0000_dear_sunfire",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1773712067162,
+      "tag": "0001_tiny_payback",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1773713018330,
+      "tag": "0002_lethal_photon",
+      "breakpoints": true
+    }
+  ]
+}
