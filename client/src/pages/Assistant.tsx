@@ -6,6 +6,7 @@ import { Send, Loader2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 interface Message {
   role: 'user' | 'assistant';
@@ -13,7 +14,9 @@ interface Message {
 }
 
 export default function Assistant() {
-  const { data: transactions = [] } = trpc.transactions.list.useQuery();
+  const { user } = useAuth();
+  const { data: transactions = [] } = trpc.transactions.list.useQuery(undefined, { enabled: !!user });
+  const chatMutation = trpc.assistant.chat.useMutation();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -85,44 +88,34 @@ export default function Assistant() {
 
     try {
       const metrics = calculateMetrics();
-      const context = `
-User's Financial Summary:
+      const financialContext = `User's Financial Summary:
 - Total Income: $${metrics.totalIncome.toFixed(2)}
 - Total Expenses: $${metrics.totalExpenses.toFixed(2)}
 - Overall Balance: $${metrics.balance.toFixed(2)}
 - Last 30 Days Income: $${metrics.recentIncome.toFixed(2)}
 - Last 30 Days Expenses: $${metrics.recentExpenses.toFixed(2)}
 - Last 30 Days Balance: $${metrics.recentBalance.toFixed(2)}
-- Total Transactions: ${metrics.transactionCount}
+- Total Transactions: ${metrics.transactionCount}`;
 
-User Question: ${userMessage}
-`;
+      let response: string;
 
-      // Simulate AI response with financial insights
-      const mockResponses: Record<string, string> = {
-        'why am i broke': `Based on your financial data, here's why you might be feeling broke:\n\n1. **Spending Pattern**: Your total expenses ($${metrics.totalExpenses.toFixed(2)}) are ${((metrics.totalExpenses / metrics.totalIncome) * 100).toFixed(0)}% of your income.\n\n2. **Recent Trend**: In the last 30 days, you spent $${metrics.recentExpenses.toFixed(2)} against $${metrics.recentIncome.toFixed(2)} in income.\n\n3. **Top Spending Categories**: Your biggest expenses are in categories ${metrics.topCategories.map(([cat, amount]) => `#${cat} ($${amount.toFixed(2)})`).join(', ')}.\n\n**Recommendation**: Try to reduce discretionary spending in your top categories by 10-15% to improve your cash flow.`,
-        'where am i spending': `Your spending breakdown shows:\n\n**Total Expenses**: $${metrics.totalExpenses.toFixed(2)}\n\n**Top Spending Categories**:\n${metrics.topCategories.map(([cat, amount], i) => `${i + 1}. Category #${cat}: $${amount.toFixed(2)} (${((amount / metrics.totalExpenses) * 100).toFixed(1)}%)`).join('\n')}\n\nConsider reviewing these categories to identify areas where you can cut back.`,
-        'how can i save money': `Here are personalized savings tips based on your data:\n\n1. **Current Savings Rate**: You're currently saving $${metrics.balance.toFixed(2)} total (${((metrics.balance / metrics.totalIncome) * 100).toFixed(1)}% of income).\n\n2. **Quick Wins**: Your top 3 spending categories account for ${((metrics.topCategories.reduce((sum, [, amount]) => sum + amount, 0) / metrics.totalExpenses) * 100).toFixed(0)}% of expenses. Reducing these by 20% could save you $${(metrics.topCategories.reduce((sum, [, amount]) => sum + amount, 0) * 0.2).toFixed(2)}/month.\n\n3. **Action Plan**:\n   - Set a monthly budget for each category\n   - Track spending daily\n   - Cut unnecessary subscriptions\n   - Use the 50/30/20 rule (50% needs, 30% wants, 20% savings)`,
-        'what is my balance': `Your current financial position:\n\n**Overall**: $${metrics.balance.toFixed(2)} (Income: $${metrics.totalIncome.toFixed(2)} - Expenses: $${metrics.totalExpenses.toFixed(2)})\n\n**Last 30 Days**: $${metrics.recentBalance.toFixed(2)} (Income: $${metrics.recentIncome.toFixed(2)} - Expenses: $${metrics.recentExpenses.toFixed(2)})\n\nYou have ${metrics.transactionCount} transactions recorded.`,
-      };
-
-      let response = mockResponses['default'] || `Based on your financial data:\n\n- Total Income: $${metrics.totalIncome.toFixed(2)}\n- Total Expenses: $${metrics.totalExpenses.toFixed(2)}\n- Current Balance: $${metrics.balance.toFixed(2)}\n\nI'm analyzing your spending patterns to provide better insights. Keep tracking your transactions for more accurate recommendations!`;
-
-      // Check for keyword matches
-      const lowerInput = userMessage.toLowerCase();
-      for (const [key, value] of Object.entries(mockResponses)) {
-        if (lowerInput.includes(key)) {
-          response = value;
-          break;
+      if (user) {
+        // Use real AI when authenticated
+        const result = await chatMutation.mutateAsync({ message: userMessage, financialContext });
+        response = result.content;
+      } else {
+        // Fallback mock responses for demo mode
+        const lowerInput = userMessage.toLowerCase();
+        if (lowerInput.includes("broke") || lowerInput.includes("spending")) {
+          response = `Based on your financial data:\n\n- **Income**: $${metrics.totalIncome.toFixed(2)}\n- **Expenses**: $${metrics.totalExpenses.toFixed(2)}\n- **Balance**: $${metrics.balance.toFixed(2)}\n\nYour expenses are **${((metrics.totalExpenses / (metrics.totalIncome || 1)) * 100).toFixed(0)}%** of your income. Sign in to get real AI-powered insights!`;
+        } else if (lowerInput.includes("save") || lowerInput.includes("balance")) {
+          response = `Your current balance is **$${metrics.balance.toFixed(2)}**.\n\nLast 30 days: Income $${metrics.recentIncome.toFixed(2)} — Expenses $${metrics.recentExpenses.toFixed(2)}.\n\n💡 Sign in to unlock personalized AI advice!`;
+        } else {
+          response = `I can see you have **${metrics.transactionCount} transactions** with a balance of **$${metrics.balance.toFixed(2)}**.\n\nFor real AI-powered financial analysis, sign in to your account!`;
         }
       }
 
-      // If no keyword match, provide generic financial advice
-      if (response === mockResponses['default']) {
-        response = `Great question! Based on your financial summary:\n\n**Your Numbers**:\n- Income: $${metrics.totalIncome.toFixed(2)}\n- Expenses: $${metrics.totalExpenses.toFixed(2)}\n- Balance: $${metrics.balance.toFixed(2)}\n\n**My Advice**: Focus on tracking all your transactions consistently. The more data you provide, the better insights I can give you. Try asking me:\n- "Why am I broke?"\n- "Where am I spending?"\n- "How can I save money?"\n- "What is my balance?"`;
-      }
-
-      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+      setMessages(prev => [...prev, { role: "assistant", content: response }]);
     } catch (error) {
       toast.error('Failed to get response');
       setMessages(prev => prev.slice(0, -1)); // Remove user message on error
