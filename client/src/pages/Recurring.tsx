@@ -83,6 +83,7 @@ export default function Recurring() {
     }
   };
 
+  const categoryMap = Object.fromEntries(categories.map(c => [c.id, c]));
   const relevantCategories = categories.filter(c => c.type === formData.type);
 
   const frequencyLabels: Record<string, string> = {
@@ -243,7 +244,7 @@ export default function Recurring() {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
-                    Category #{item.categoryId}
+                    {categoryMap[item.categoryId]?.name ?? `Category ${item.categoryId}`}
                   </div>
                   <div className={`text-lg font-semibold ${item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                     {item.type === 'income' ? '+' : '-'}${parseFloat(item.amount).toFixed(2)}

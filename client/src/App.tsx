@@ -11,6 +11,7 @@ import Wishlist from "./pages/Wishlist";
 import Budgets from "./pages/Budgets";
 import Recurring from "./pages/Recurring";
 import Assistant from "./pages/Assistant";
+import Goals from "./pages/Goals";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import { useAuth } from "./_core/hooks/useAuth";
@@ -47,6 +48,7 @@ function Router() {
       <Route path="/wishlist" component={() => <DashboardLayout><Wishlist /></DashboardLayout>} />
       <Route path="/budgets" component={() => <DashboardLayout><Budgets /></DashboardLayout>} />
       <Route path="/recurring" component={() => <DashboardLayout><Recurring /></DashboardLayout>} />
+      <Route path="/goals" component={() => <DashboardLayout><Goals /></DashboardLayout>} />
       <Route path="/assistant" component={() => <DashboardLayout><Assistant /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

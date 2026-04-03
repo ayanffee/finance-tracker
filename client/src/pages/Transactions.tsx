@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -14,9 +14,11 @@ export default function Transactions() {
   const { data: transactions = [], refetch } = trpc.transactions.list.useQuery();
   const { data: categories = [] } = trpc.categories.list.useQuery();
   const createMutation = trpc.transactions.create.useMutation();
+  const updateMutation = trpc.transactions.update.useMutation();
   const deleteMutation = trpc.transactions.delete.useMutation();
 
   const [open, setOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<typeof transactions[0] | null>(null);
   const [formData, setFormData] = useState({
     type: 'expense',
     categoryId: '',
@@ -24,6 +26,23 @@ export default function Transactions() {
     date: new Date().toISOString().split('T')[0],
     description: '',
   });
+
+  const resetForm = () => {
+    setFormData({ type: 'expense', categoryId: '', amount: '', date: new Date().toISOString().split('T')[0], description: '' });
+    setEditingTransaction(null);
+  };
+
+  const openEdit = (tx: typeof transactions[0]) => {
+    setEditingTransaction(tx);
+    setFormData({
+      type: tx.type,
+      categoryId: tx.categoryId.toString(),
+      amount: parseFloat(tx.amount).toString(),
+      date: new Date(tx.date).toISOString().split('T')[0],
+      description: tx.description ?? '',
+    });
+    setOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,26 +53,31 @@ export default function Transactions() {
     }
 
     try {
-      await createMutation.mutateAsync({
-        categoryId: parseInt(formData.categoryId),
-        type: formData.type as 'income' | 'expense',
-        amount: formData.amount,
-        date: new Date(formData.date),
-        description: formData.description || undefined,
-      });
+      if (editingTransaction) {
+        await updateMutation.mutateAsync({
+          id: editingTransaction.id,
+          categoryId: parseInt(formData.categoryId),
+          amount: formData.amount,
+          date: new Date(formData.date),
+          description: formData.description || undefined,
+        });
+        toast.success('Transaction updated');
+      } else {
+        await createMutation.mutateAsync({
+          categoryId: parseInt(formData.categoryId),
+          type: formData.type as 'income' | 'expense',
+          amount: formData.amount,
+          date: new Date(formData.date),
+          description: formData.description || undefined,
+        });
+        toast.success('Transaction added successfully');
+      }
 
-      toast.success('Transaction added successfully');
-      setFormData({
-        type: 'expense',
-        categoryId: '',
-        amount: '',
-        date: new Date().toISOString().split('T')[0],
-        description: '',
-      });
+      resetForm();
       setOpen(false);
       refetch();
     } catch (error) {
-      toast.error('Failed to add transaction');
+      toast.error(editingTransaction ? 'Failed to update transaction' : 'Failed to add transaction');
     }
   };
 
@@ -67,6 +91,7 @@ export default function Transactions() {
     }
   };
 
+  const categoryMap = Object.fromEntries(categories.map(c => [c.id, c]));
   const expenseCategories = categories.filter(c => c.type === 'expense');
   const incomeCategories = categories.filter(c => c.type === 'income');
   const relevantCategories = formData.type === 'income' ? incomeCategories : expenseCategories;
@@ -78,7 +103,7 @@ export default function Transactions() {
           <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
           <p className="text-muted-foreground mt-2">Manage your income and expenses</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); setOpen(v); }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
@@ -87,11 +112,12 @@ export default function Transactions() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Transaction</DialogTitle>
-              <DialogDescription>Record a new income or expense</DialogDescription>
+              <DialogTitle>{editingTransaction ? 'Edit Transaction' : 'Add New Transaction'}</DialogTitle>
+              <DialogDescription>{editingTransaction ? 'Update this transaction' : 'Record a new income or expense'}</DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {!editingTransaction && (
               <div>
                 <Label htmlFor="type">Type</Label>
                 <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value, categoryId: '' })}>
@@ -104,6 +130,7 @@ export default function Transactions() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
 
               <div>
                 <Label htmlFor="category">Category</Label>
@@ -155,8 +182,10 @@ export default function Transactions() {
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Adding...' : 'Add Transaction'}
+              <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+                {editingTransaction
+                  ? (updateMutation.isPending ? 'Saving...' : 'Save Changes')
+                  : (createMutation.isPending ? 'Adding...' : 'Add Transaction')}
               </Button>
             </form>
           </DialogContent>
@@ -180,13 +209,20 @@ export default function Transactions() {
                   <div className="flex-1">
                     <p className="font-medium">{transaction.description || 'Transaction'}</p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(transaction.date).toLocaleDateString()} • Category {transaction.categoryId}
+                      {new Date(transaction.date).toLocaleDateString()} • {categoryMap[transaction.categoryId]?.name ?? `Category ${transaction.categoryId}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className={`text-lg font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                       {transaction.type === 'income' ? '+' : '-'}${parseFloat(transaction.amount).toFixed(2)}
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEdit(transaction)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

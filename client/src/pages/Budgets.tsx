@@ -75,6 +75,7 @@ export default function Budgets() {
       .reduce((sum, t) => sum + parseFloat(t.amount), 0);
   };
 
+  const categoryMap = Object.fromEntries(categories.map(c => [c.id, c]));
   const expenseCategories = categories.filter(c => c.type === 'expense');
 
   return (
@@ -164,7 +165,7 @@ export default function Budgets() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {isAlert && <AlertCircle className={`h-5 w-5 ${isExceeded ? 'text-red-600' : 'text-yellow-600'}`} />}
-                      <CardTitle className="text-lg">Category {budget.categoryId}</CardTitle>
+                      <CardTitle className="text-lg">{categoryMap[budget.categoryId]?.name ?? `Category ${budget.categoryId}`}</CardTitle>
                     </div>
                     <Button
                       variant="ghost"

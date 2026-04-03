@@ -5,6 +5,7 @@ import { DollarSign, TrendingDown, TrendingUp } from "lucide-react";
 
 export default function Dashboard() {
   const { data: transactions = [] } = trpc.transactions.list.useQuery();
+  const { data: categories = [] } = trpc.categories.list.useQuery();
 
   // Calculate totals
   const income = transactions
@@ -48,8 +49,9 @@ export default function Dashboard() {
       return acc;
     }, {});
 
+  const categoryMap = Object.fromEntries(categories.map(c => [c.id, c.name]));
   const categoryData = Object.entries(expensesByCategory).map(([categoryId, amount]) => ({
-    name: `Category ${categoryId}`,
+    name: categoryMap[Number(categoryId)] ?? `Category ${categoryId}`,
     value: amount,
   }));
 
