@@ -12,15 +12,14 @@ import Budgets from "./pages/Budgets";
 import Recurring from "./pages/Recurring";
 import Assistant from "./pages/Assistant";
 import Goals from "./pages/Goals";
+import AutoImport from "./pages/AutoImport";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import { useAuth } from "./_core/hooks/useAuth";
-import { useDemo } from "./contexts/DemoContext";
 import { Loader2 } from "lucide-react";
 
 function Router() {
   const { user, loading } = useAuth();
-  const { isDemoMode } = useDemo();
 
   if (loading) {
     return (
@@ -30,7 +29,7 @@ function Router() {
     );
   }
 
-  if (!user && !isDemoMode) {
+  if (!user) {
     return (
       <Switch>
         <Route path="/login" component={Login} />
@@ -50,6 +49,7 @@ function Router() {
       <Route path="/recurring" component={() => <DashboardLayout><Recurring /></DashboardLayout>} />
       <Route path="/goals" component={() => <DashboardLayout><Goals /></DashboardLayout>} />
       <Route path="/assistant" component={() => <DashboardLayout><Assistant /></DashboardLayout>} />
+      <Route path="/auto-import" component={() => <DashboardLayout><AutoImport /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

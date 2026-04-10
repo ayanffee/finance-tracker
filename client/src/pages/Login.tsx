@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
-import { useDemo } from "@/contexts/DemoContext";
 import { toast } from "sonner";
 import { BarChart3 } from "lucide-react";
 
@@ -15,11 +14,9 @@ export default function Login() {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [, setLocation] = useLocation();
-  const { setDemoMode } = useDemo();
   const utils = trpc.useUtils();
 
   const onSuccess = () => {
-    setDemoMode(false);
     utils.auth.me.invalidate();
     setLocation("/");
   };
@@ -109,15 +106,6 @@ export default function Login() {
                 className="text-blue-600 hover:underline font-medium"
               >
                 {isRegister ? "Sign In" : "Create one"}
-              </button>
-            </div>
-
-            <div className="mt-3 text-center">
-              <button
-                onClick={() => setLocation("/")}
-                className="text-sm text-muted-foreground hover:underline"
-              >
-                Continue as guest (demo mode)
               </button>
             </div>
           </CardContent>

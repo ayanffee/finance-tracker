@@ -1,11 +1,15 @@
-import { eq } from "drizzle-orm";
+import { eq, and, desc, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
   users, categories, transactions, wishlistItems,
   financialGoals, budgets, recurringTransactions,
+  aiConversations, monthlySnapshots,
+  oauthTokens, importQueue,
   type InsertTransaction, type InsertWishlistItem,
   type InsertFinancialGoal, type InsertBudget, type InsertRecurringTransaction,
+  type InsertAiConversation, type InsertMonthlySnapshot,
+  type InsertOauthToken, type InsertImportQueueItem,
 } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -13,7 +17,13 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const client = postgres(process.env.DATABASE_URL, { ssl: "require", max: 1 });
+      const client = postgres(process.env.DATABASE_URL, {
+        ssl: "require",
+        max: 10,          // 10 connections per serverless instance
+        idle_timeout: 20, // release idle connections after 20s
+        connect_timeout: 10,
+        prepare: false,   // required for PgBouncer / Neon pooler compatibility
+      });
       _db = drizzle(client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
@@ -254,4 +264,164 @@ export async function deleteRecurringTransaction(id: number, userId: number) {
   const existing = await getRecurringTransactionById(id, userId);
   if (!existing) throw new Error("Recurring transaction not found");
   return db.delete(recurringTransactions).where(eq(recurringTransactions.id, id));
+}
+
+// ===== AI CONVERSATION HISTORY =====
+export async function appendConversationMessage(userId: number, role: "user" | "assistant", content: string) {
+  const db = getDb();
+  if (!db) return;
+  await db.insert(aiConversations).values({ userId, role, content });
+}
+
+export async function getRecentConversation(userId: number, limit = 20) {
+  const db = getDb();
+  if (!db) return [];
+  // Fetch last N messages ordered oldest-first for chronological context
+  const rows = await db
+    .select()
+    .from(aiConversations)
+    .where(eq(aiConversations.userId, userId))
+    .orderBy(desc(aiConversations.createdAt))
+    .limit(limit);
+  return rows.reverse();
+}
+
+export async function getConversationHistory(userId: number, limit = 50) {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db
+    .select()
+    .from(aiConversations)
+    .where(eq(aiConversations.userId, userId))
+    .orderBy(desc(aiConversations.createdAt))
+    .limit(limit);
+  return rows.reverse();
+}
+
+export async function clearConversationHistory(userId: number) {
+  const db = getDb();
+  if (!db) return;
+  await db.delete(aiConversations).where(eq(aiConversations.userId, userId));
+}
+
+// ===== MONTHLY SNAPSHOTS =====
+export async function upsertMonthlySnapshot(userId: number, year: number, month: number, data: Omit<InsertMonthlySnapshot, "userId" | "year" | "month">) {
+  const db = getDb();
+  if (!db) return;
+  const existing = await db
+    .select()
+    .from(monthlySnapshots)
+    .where(and(eq(monthlySnapshots.userId, userId), eq(monthlySnapshots.year, year), eq(monthlySnapshots.month, month)))
+    .limit(1);
+
+  if (existing.length > 0) {
+    await db
+      .update(monthlySnapshots)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(monthlySnapshots.id, existing[0].id));
+  } else {
+    await db.insert(monthlySnapshots).values({ userId, year, month, ...data });
+  }
+}
+
+export async function getMonthlySnapshots(userId: number, limitMonths = 6) {
+  const db = getDb();
+  if (!db) return [];
+  const rows = await db
+    .select()
+    .from(monthlySnapshots)
+    .where(eq(monthlySnapshots.userId, userId))
+    .orderBy(desc(monthlySnapshots.year), desc(monthlySnapshots.month))
+    .limit(limitMonths);
+  return rows.reverse(); // oldest first for charting
+}
+
+// ===== OAUTH TOKENS =====
+export async function upsertOauthToken(userId: number, provider: string, data: Omit<InsertOauthToken, "userId" | "provider">) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db.select().from(oauthTokens)
+    .where(and(eq(oauthTokens.userId, userId), eq(oauthTokens.provider, provider)))
+    .limit(1);
+  if (existing.length > 0) {
+    await db.update(oauthTokens).set({ ...data, updatedAt: new Date() }).where(eq(oauthTokens.id, existing[0].id));
+  } else {
+    await db.insert(oauthTokens).values({ userId, provider, ...data });
+  }
+}
+
+export async function getOauthToken(userId: number, provider: string) {
+  const db = getDb();
+  if (!db) return null;
+  const rows = await db.select().from(oauthTokens)
+    .where(and(eq(oauthTokens.userId, userId), eq(oauthTokens.provider, provider)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function deleteOauthToken(userId: number, provider: string) {
+  const db = getDb();
+  if (!db) return;
+  await db.delete(oauthTokens)
+    .where(and(eq(oauthTokens.userId, userId), eq(oauthTokens.provider, provider)));
+}
+
+export async function getAllConnectedGmailUsers() {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(oauthTokens).where(eq(oauthTokens.provider, "gmail"));
+}
+
+export async function updateLastScanned(userId: number, provider: string) {
+  const db = getDb();
+  if (!db) return;
+  await db.update(oauthTokens)
+    .set({ lastScannedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(oauthTokens.userId, userId), eq(oauthTokens.provider, provider)));
+}
+
+// ===== IMPORT QUEUE =====
+export async function getImportQueue(userId: number, status: "pending" | "approved" | "dismissed" = "pending") {
+  const db = getDb();
+  if (!db) return [];
+  return db.select().from(importQueue)
+    .where(and(eq(importQueue.userId, userId), eq(importQueue.status, status)))
+    .orderBy(desc(importQueue.createdAt));
+}
+
+export async function isAlreadyQueued(userId: number, externalRef: string) {
+  const db = getDb();
+  if (!db) return false;
+  const rows = await db.select({ id: importQueue.id }).from(importQueue)
+    .where(and(eq(importQueue.userId, userId), eq(importQueue.externalRef, externalRef)))
+    .limit(1);
+  return rows.length > 0;
+}
+
+export async function addToImportQueue(item: InsertImportQueueItem) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(importQueue).values(item).returning();
+  return result[0];
+}
+
+export async function updateImportQueueStatus(id: number, userId: number, status: "approved" | "dismissed") {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(importQueue).set({ status }).where(and(eq(importQueue.id, id), eq(importQueue.userId, userId)));
+}
+
+export async function updateAllImportQueueStatus(userId: number, status: "approved" | "dismissed") {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(importQueue).set({ status })
+    .where(and(eq(importQueue.userId, userId), eq(importQueue.status, "pending")));
+}
+
+export async function getPendingQueueCount(userId: number) {
+  const db = getDb();
+  if (!db) return 0;
+  const rows = await db.select({ id: importQueue.id }).from(importQueue)
+    .where(and(eq(importQueue.userId, userId), eq(importQueue.status, "pending")));
+  return rows.length;
 }

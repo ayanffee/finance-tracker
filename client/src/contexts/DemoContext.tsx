@@ -1,38 +1,23 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext } from 'react';
 
 interface DemoContextType {
   isDemoMode: boolean;
   setDemoMode: (value: boolean) => void;
 }
 
-const DemoContext = createContext<DemoContextType | undefined>(undefined);
+const DemoContext = createContext<DemoContextType>({
+  isDemoMode: false,
+  setDemoMode: () => {},
+});
 
 export function DemoProvider({ children }: { children: React.ReactNode }) {
-  const [isDemoMode, setDemoMode] = useState(true);
-
-  useEffect(() => {
-    const savedDemoMode = localStorage.getItem('finance-tracker-demo-mode');
-    if (savedDemoMode === 'false') {
-      setDemoMode(false);
-    }
-  }, []);
-
-  const handleSetDemoMode = (value: boolean) => {
-    setDemoMode(value);
-    localStorage.setItem('finance-tracker-demo-mode', String(value));
-  };
-
   return (
-    <DemoContext.Provider value={{ isDemoMode, setDemoMode: handleSetDemoMode }}>
+    <DemoContext.Provider value={{ isDemoMode: false, setDemoMode: () => {} }}>
       {children}
     </DemoContext.Provider>
   );
 }
 
 export function useDemo() {
-  const context = useContext(DemoContext);
-  if (context === undefined) {
-    throw new Error('useDemo must be used within DemoProvider');
-  }
-  return context;
+  return useContext(DemoContext);
 }

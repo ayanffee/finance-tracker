@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useTheme } from "@/contexts/ThemeContext";
-import { LayoutDashboard, LogOut, Moon, PanelLeft, Sun, Users, Wallet, Zap, WandSparkles, Target } from "lucide-react";
+import { LayoutDashboard, LogOut, Moon, PanelLeft, Sun, Users, Wallet, Zap, WandSparkles, Target, Import } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -29,6 +29,7 @@ import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Wallet, label: "Transactions", path: "/transactions" },
+  { icon: Import, label: "Auto Import", path: "/auto-import" },
   { icon: Zap, label: "Wishlist", path: "/wishlist" },
   { icon: Users, label: "Budgets", path: "/budgets" },
   { icon: Users, label: "Recurring", path: "/recurring" },
