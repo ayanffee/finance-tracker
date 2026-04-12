@@ -4,4 +4,4 @@ node_modules/
 dist/
 .DS_Store
 .vercel
-api/index.mjs
+api/index.js
