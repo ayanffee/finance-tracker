@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm dev:*)",
+      "Bash(pnpm check:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/mac/Downloads/leadgen-saas/backend",
+      "/Users/mac/Downloads/leadgen-saas/frontend",
+      "/Users/mac/Downloads/leadgen-saas/frontend/src/app/campaigns",
+      "/Users/mac/Downloads/leadgen-saas"
+    ]
+  }
+}
