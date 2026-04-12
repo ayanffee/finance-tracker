@@ -3,7 +3,7 @@
  * Handles plan creation, checkout initialization, subscription management, and webhook verification.
  */
 
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { ENV } from "./_core/env";
 
 const PAYSTACK_BASE = "https://api.paystack.co";
