@@ -3,10 +3,11 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+import { registerOAuthRoutes, registerPaystackWebhook } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { apiRateLimit } from "./rateLimit";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -30,10 +31,14 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
+  // Paystack webhook MUST be registered before body parsers (needs raw body for HMAC)
+  registerPaystackWebhook(app);
+  // Configure body parser with safe size limit
+  app.use(express.json({ limit: "5mb" }));
+  app.use(express.urlencoded({ limit: "5mb", extended: true }));
+  // Rate limiting
+  app.use("/api", apiRateLimit);
+  // OAuth callbacks + SMS webhook
   registerOAuthRoutes(app);
   // tRPC API
   app.use(

@@ -13,6 +13,7 @@ import Recurring from "./pages/Recurring";
 import Assistant from "./pages/Assistant";
 import Goals from "./pages/Goals";
 import AutoImport from "./pages/AutoImport";
+import Billing from "./pages/Billing";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import { useAuth } from "./_core/hooks/useAuth";
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/goals" component={() => <DashboardLayout><Goals /></DashboardLayout>} />
       <Route path="/assistant" component={() => <DashboardLayout><Assistant /></DashboardLayout>} />
       <Route path="/auto-import" component={() => <DashboardLayout><AutoImport /></DashboardLayout>} />
+      <Route path="/billing" component={() => <DashboardLayout><Billing /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

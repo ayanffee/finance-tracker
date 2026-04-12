@@ -9,10 +9,16 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Plus, Trash2, CheckCircle2, Circle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useDemo } from "@/contexts/DemoContext";
+import { useDemoData } from "@/hooks/useDemoData";
 
 export default function Wishlist() {
-  const { data: wishlistItems = [], refetch } = trpc.wishlist.list.useQuery();
-  const { data: transactions = [] } = trpc.transactions.list.useQuery();
+  const { isDemoMode } = useDemo();
+  const { demoData } = useDemoData();
+  const { data: _wishlistItems = [], refetch } = trpc.wishlist.list.useQuery(undefined, { enabled: !isDemoMode });
+  const { data: _transactions = [] } = trpc.transactions.list.useQuery(undefined, { enabled: !isDemoMode });
+  const wishlistItems = isDemoMode ? demoData.wishlist : _wishlistItems;
+  const transactions = isDemoMode ? demoData.transactions : _transactions;
   const createMutation = trpc.wishlist.create.useMutation();
   const updateMutation = trpc.wishlist.update.useMutation();
   const deleteMutation = trpc.wishlist.delete.useMutation();
@@ -28,6 +34,12 @@ export default function Wishlist() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isDemoMode) {
+      toast.info('Sign in to save wishlist items');
+      setOpen(false);
+      return;
+    }
 
     if (!formData.name || !formData.estimatedPrice) {
       toast.error('Please fill in all required fields');
@@ -59,6 +71,10 @@ export default function Wishlist() {
   };
 
   const handleTogglePurchased = async (item: any) => {
+    if (isDemoMode) {
+      toast.info('Sign in to update wishlist items');
+      return;
+    }
     try {
       await updateMutation.mutateAsync({
         id: item.id,
@@ -71,6 +87,10 @@ export default function Wishlist() {
   };
 
   const handleDelete = async (id: number) => {
+    if (isDemoMode) {
+      toast.info('Sign in to delete wishlist items');
+      return;
+    }
     try {
       await deleteMutation.mutateAsync({ id });
       toast.success('Item deleted');

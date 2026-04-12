@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useTheme } from "@/contexts/ThemeContext";
-import { LayoutDashboard, LogOut, Moon, PanelLeft, Sun, Users, Wallet, Zap, WandSparkles, Target, Import } from "lucide-react";
+import { LayoutDashboard, LogOut, Moon, PanelLeft, Sun, Users, Wallet, Zap, WandSparkles, Target, Import, Crown } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -35,6 +35,7 @@ const menuItems = [
   { icon: Users, label: "Recurring", path: "/recurring" },
   { icon: Target, label: "Goals", path: "/goals" },
   { icon: WandSparkles, label: "AI Assistant", path: "/assistant" },
+  { icon: Crown, label: "Billing", path: "/billing" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -245,9 +246,18 @@ function DashboardLayoutContent({
                 </div>
               </div>
             </div>
+            {toggleTheme && (
+              <button
+                onClick={toggleTheme}
+                className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-lg transition-colors"
+                aria-label="Toggle theme"
+              >
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+            )}
           </div>
         )}
-        <main className="flex-1 p-4">{children}</main>
+        <main className="flex-1 p-3 sm:p-4 md:p-6">{children}</main>
       </SidebarInset>
     </>
   );

@@ -19,7 +19,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Finance Tracker</h1>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Frugal</h1>
           </div>
           <Button onClick={() => setLocation("/login")} variant="outline">
             Sign In

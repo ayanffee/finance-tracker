@@ -24,6 +24,14 @@ export async function setupVite(app: Express, server: Server) {
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
 
+    const acceptsHtml = req.method === "GET" && (req.headers.accept?.includes("text/html") ?? false);
+    const pathname = url.split("?")[0];
+    const isAssetLikePath = pathname.includes(".") || pathname.startsWith("/.well-known/");
+
+    if (!acceptsHtml || isAssetLikePath) {
+      return next();
+    }
+
     try {
       const clientTemplate = path.resolve(
         import.meta.dirname,

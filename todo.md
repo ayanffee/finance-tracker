@@ -1,4 +1,4 @@
-# Finance Tracker TODO
+# Frugal TODO
 
 ## Database & Schema
 - [x] Create transactions table (id, userId, type, amount, category, date, description)
@@ -15,8 +15,8 @@
 - [x] Create spending analytics procedures (daily/weekly/monthly totals)
 - [x] Create budget CRUD procedures
 - [x] Create recurring transaction CRUD procedures
-- [ ] Create CSV parsing and transaction import procedure
-- [ ] Create AI assistant procedure for spending analysis
+- [x] Create CSV parsing and transaction import procedure
+- [x] Create AI assistant procedure for spending analysis (claude-haiku-4-5)
 
 ## Frontend - Dashboard
 - [x] Create DashboardLayout with sidebar navigation
@@ -28,9 +28,9 @@
 ## Frontend - Transaction Management
 - [x] Create transaction entry form with category selector
 - [x] Build transaction list page with filtering (date, category, type)
-- [ ] Create CSV upload component with preview
+- [x] Create CSV upload component with preview
 - [x] Add transaction edit/delete functionality
-- [ ] Create transaction detail view
+- [x] Create transaction detail view
 
 ## Frontend - Wishlist & Projections
 - [x] Build wishlist page with add/edit/delete items
@@ -56,13 +56,13 @@
 ## Frontend - Polish
 - [x] Add loading states and error handling
 - [x] Create empty states for all pages
-- [ ] Add responsive design for mobile
-- [ ] Implement dark/light theme toggle
+- [x] Add responsive design for mobile
+- [x] Implement dark/light theme toggle
 - [x] Add navigation between all features
 
 ## Testing & Deployment
 - [x] Write vitest tests for backend procedures
 - [x] Write vitest tests for data calculations
-- [ ] Test CSV parsing with sample files
-- [ ] Test AI assistant responses
-- [ ] Create checkpoint and prepare for deployment
+- [x] Test CSV parsing with sample files
+- [x] Test AI assistant responses
+- [x] Create checkpoint and prepare for deployment

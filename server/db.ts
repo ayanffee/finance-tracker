@@ -1,11 +1,11 @@
-import { eq, and, desc, ne } from "drizzle-orm";
+import { eq, and, desc, ne, gte, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
   users, categories, transactions, wishlistItems,
   financialGoals, budgets, recurringTransactions,
   aiConversations, monthlySnapshots,
-  oauthTokens, importQueue,
+  oauthTokens, importQueue, subscriptions, aiUsage,
   type InsertTransaction, type InsertWishlistItem,
   type InsertFinancialGoal, type InsertBudget, type InsertRecurringTransaction,
   type InsertAiConversation, type InsertMonthlySnapshot,
@@ -19,10 +19,10 @@ export function getDb() {
     try {
       const client = postgres(process.env.DATABASE_URL, {
         ssl: "require",
-        max: 10,          // 10 connections per serverless instance
-        idle_timeout: 20, // release idle connections after 20s
+        max: 3,            // Keep low — each serverless instance gets its own pool
+        idle_timeout: 10,  // Release idle connections quickly
         connect_timeout: 10,
-        prepare: false,   // required for PgBouncer / Neon pooler compatibility
+        prepare: false,    // Required for PgBouncer / Neon pooler compatibility
       });
       _db = drizzle(client);
     } catch (error) {
@@ -106,6 +106,45 @@ export async function updateTransaction(id: number, userId: number, updates: Par
   const existing = await getTransactionById(id, userId);
   if (!existing) throw new Error("Transaction not found");
   return db.update(transactions).set({ ...updates, updatedAt: new Date() }).where(eq(transactions.id, id));
+}
+
+// Paginated: fetch only recent transactions (for AI context, dashboards)
+export async function getRecentUserTransactions(userId: number, months = 6, limit = 500) {
+  const db = getDb();
+  if (!db) return [];
+  const since = new Date();
+  since.setMonth(since.getMonth() - months);
+  return db.select().from(transactions)
+    .where(and(eq(transactions.userId, userId), gte(transactions.date, since)))
+    .orderBy(desc(transactions.date))
+    .limit(limit);
+}
+
+// Aggregate totals for older transactions (for all-time stats without fetching everything)
+export async function getUserTransactionTotals(userId: number) {
+  const db = getDb();
+  if (!db) return { totalIncome: 0, totalExpenses: 0, count: 0 };
+  const result = await db.select({
+    totalIncome: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'income' THEN ${transactions.amount} ELSE 0 END), 0)`,
+    totalExpenses: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'expense' THEN ${transactions.amount} ELSE 0 END), 0)`,
+    count: sql<number>`COUNT(*)`,
+  }).from(transactions).where(eq(transactions.userId, userId));
+  return {
+    totalIncome: parseFloat(result[0]?.totalIncome ?? "0"),
+    totalExpenses: parseFloat(result[0]?.totalExpenses ?? "0"),
+    count: result[0]?.count ?? 0,
+  };
+}
+
+// Batch dedup check for import queue (avoids N+1)
+export async function getExistingExternalRefs(userId: number, refs: string[]): Promise<Set<string>> {
+  const db = getDb();
+  if (!db) return new Set();
+  if (refs.length === 0) return new Set();
+  const rows = await db.select({ externalRef: importQueue.externalRef })
+    .from(importQueue)
+    .where(and(eq(importQueue.userId, userId), inArray(importQueue.externalRef, refs)));
+  return new Set(rows.map(r => r.externalRef).filter(Boolean) as string[]);
 }
 
 export async function deleteTransaction(id: number, userId: number) {
@@ -424,4 +463,60 @@ export async function getPendingQueueCount(userId: number) {
   const rows = await db.select({ id: importQueue.id }).from(importQueue)
     .where(and(eq(importQueue.userId, userId), eq(importQueue.status, "pending")));
   return rows.length;
+}
+
+// ===== SUBSCRIPTIONS =====
+export async function getUserSubscription(userId: number) {
+  const db = getDb();
+  if (!db) return null;
+  const rows = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertSubscription(userId: number, data: Partial<typeof subscriptions.$inferInsert>) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await getUserSubscription(userId);
+  if (existing) {
+    await db.update(subscriptions).set({ ...data, updatedAt: new Date() }).where(eq(subscriptions.id, existing.id));
+    return { ...existing, ...data };
+  } else {
+    const result = await db.insert(subscriptions).values({ userId, ...data } as any).returning();
+    return result[0];
+  }
+}
+
+export async function cancelSubscription(userId: number) {
+  const db = getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(subscriptions).set({ plan: "free", status: "cancelled", updatedAt: new Date() })
+    .where(eq(subscriptions.userId, userId));
+}
+
+// ===== AI USAGE TRACKING =====
+export async function getAiUsageThisMonth(userId: number) {
+  const db = getDb();
+  if (!db) return 0;
+  const now = new Date();
+  const rows = await db.select().from(aiUsage)
+    .where(and(eq(aiUsage.userId, userId), eq(aiUsage.year, now.getFullYear()), eq(aiUsage.month, now.getMonth() + 1)))
+    .limit(1);
+  return rows[0]?.messageCount ?? 0;
+}
+
+export async function incrementAiUsage(userId: number) {
+  const db = getDb();
+  if (!db) return;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const existing = await db.select().from(aiUsage)
+    .where(and(eq(aiUsage.userId, userId), eq(aiUsage.year, year), eq(aiUsage.month, month)))
+    .limit(1);
+  if (existing.length > 0) {
+    await db.update(aiUsage).set({ messageCount: existing[0].messageCount + 1, updatedAt: new Date() })
+      .where(eq(aiUsage.id, existing[0].id));
+  } else {
+    await db.insert(aiUsage).values({ userId, year, month, messageCount: 1 });
+  }
 }

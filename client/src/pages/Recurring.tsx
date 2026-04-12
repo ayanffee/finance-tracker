@@ -9,10 +9,16 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Plus, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useDemo } from "@/contexts/DemoContext";
+import { useDemoData } from "@/hooks/useDemoData";
 
 export default function Recurring() {
-  const { data: recurring = [], refetch } = trpc.recurring.list.useQuery();
-  const { data: categories = [] } = trpc.categories.list.useQuery();
+  const { isDemoMode } = useDemo();
+  const { demoData } = useDemoData();
+  const { data: _recurring = [], refetch } = trpc.recurring.list.useQuery(undefined, { enabled: !isDemoMode });
+  const { data: _categories = [] } = trpc.categories.list.useQuery(undefined, { enabled: !isDemoMode });
+  const recurring = isDemoMode ? demoData.recurring : _recurring;
+  const categories = isDemoMode ? demoData.categories : _categories;
   const createMutation = trpc.recurring.create.useMutation();
   const updateMutation = trpc.recurring.update.useMutation();
   const deleteMutation = trpc.recurring.delete.useMutation();
@@ -29,6 +35,12 @@ export default function Recurring() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isDemoMode) {
+      toast.info('Sign in to create recurring transactions');
+      setOpen(false);
+      return;
+    }
 
     if (!formData.categoryId || !formData.amount) {
       toast.error('Please fill in all required fields');
@@ -62,6 +74,10 @@ export default function Recurring() {
   };
 
   const handleToggleActive = async (item: any) => {
+    if (isDemoMode) {
+      toast.info('Sign in to manage recurring transactions');
+      return;
+    }
     try {
       await updateMutation.mutateAsync({
         id: item.id,
@@ -74,6 +90,10 @@ export default function Recurring() {
   };
 
   const handleDelete = async (id: number) => {
+    if (isDemoMode) {
+      toast.info('Sign in to delete recurring transactions');
+      return;
+    }
     try {
       await deleteMutation.mutateAsync({ id });
       toast.success('Recurring transaction deleted');

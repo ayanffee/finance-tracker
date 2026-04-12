@@ -8,11 +8,18 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Plus, Trash2, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useDemo } from "@/contexts/DemoContext";
+import { useDemoData } from "@/hooks/useDemoData";
 
 export default function Budgets() {
-  const { data: budgets = [], refetch } = trpc.budgets.list.useQuery();
-  const { data: categories = [] } = trpc.categories.list.useQuery();
-  const { data: transactions = [] } = trpc.transactions.list.useQuery();
+  const { isDemoMode } = useDemo();
+  const { demoData } = useDemoData();
+  const { data: _budgets = [], refetch } = trpc.budgets.list.useQuery(undefined, { enabled: !isDemoMode });
+  const { data: _categories = [] } = trpc.categories.list.useQuery(undefined, { enabled: !isDemoMode });
+  const { data: _transactions = [] } = trpc.transactions.list.useQuery(undefined, { enabled: !isDemoMode });
+  const budgets = isDemoMode ? demoData.budgets : _budgets;
+  const categories = isDemoMode ? demoData.categories : _categories;
+  const transactions = isDemoMode ? demoData.transactions : _transactions;
   const createMutation = trpc.budgets.create.useMutation();
   const deleteMutation = trpc.budgets.delete.useMutation();
 
@@ -25,6 +32,12 @@ export default function Budgets() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isDemoMode) {
+      toast.info('Sign in to create budgets');
+      setOpen(false);
+      return;
+    }
 
     if (!formData.categoryId || !formData.monthlyLimit) {
       toast.error('Please fill in all required fields');
@@ -52,6 +65,10 @@ export default function Budgets() {
   };
 
   const handleDelete = async (id: number) => {
+    if (isDemoMode) {
+      toast.info('Sign in to delete budgets');
+      return;
+    }
     try {
       await deleteMutation.mutateAsync({ id });
       toast.success('Budget deleted');

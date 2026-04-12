@@ -2,14 +2,19 @@ import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../server/routers";
 import { createContext } from "../server/_core/context";
-import { registerOAuthRoutes } from "../server/_core/oauth";
+import { registerOAuthRoutes, registerPaystackWebhook } from "../server/_core/oauth";
+import { apiRateLimit } from "../server/_core/rateLimit";
 
 const app = express();
 
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+// Paystack webhook MUST be before body parsers (needs raw body for HMAC)
+registerPaystackWebhook(app);
 
-// OAuth callbacks (Gmail, etc.)
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ limit: "5mb", extended: true }));
+app.use(apiRateLimit);
+
+// OAuth callbacks + SMS webhook
 registerOAuthRoutes(app);
 
 app.use(
