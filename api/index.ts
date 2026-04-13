@@ -1,37 +1,45 @@
-let app: any;
+import express from "express";
+import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { appRouter } from "../server/routers";
+import { createContext } from "../server/_core/context";
+import { registerOAuthRoutes, registerPaystackWebhook } from "../server/_core/oauth";
+import { apiRateLimit } from "../server/_core/rateLimit";
+
+let app: ReturnType<typeof express> | null = null;
 let initError: string | null = null;
 
-try {
-  const express = await import("express");
-  const { createExpressMiddleware } = await import("@trpc/server/adapters/express");
-  const { appRouter } = await import("../server/routers");
-  const { createContext } = await import("../server/_core/context");
-  const { registerOAuthRoutes, registerPaystackWebhook } = await import("../server/_core/oauth");
-  const { apiRateLimit } = await import("../server/_core/rateLimit");
+function getApp() {
+  if (app) return app;
+  if (initError) return null;
 
-  app = express.default();
+  try {
+    app = express();
 
-  registerPaystackWebhook(app);
-  app.use(express.default.json({ limit: "5mb" }));
-  app.use(express.default.urlencoded({ limit: "5mb", extended: true }));
-  app.use(apiRateLimit);
-  registerOAuthRoutes(app);
+    registerPaystackWebhook(app);
+    app.use(express.json({ limit: "5mb" }));
+    app.use(express.urlencoded({ limit: "5mb", extended: true }));
+    app.use(apiRateLimit);
+    registerOAuthRoutes(app);
 
-  app.use(
-    "/api/trpc",
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
-} catch (err: any) {
-  initError = err?.stack || err?.message || String(err);
-  console.error("INIT ERROR:", initError);
+    app.use(
+      "/api/trpc",
+      createExpressMiddleware({
+        router: appRouter,
+        createContext,
+      })
+    );
+  } catch (err: any) {
+    initError = err?.stack || err?.message || String(err);
+    console.error("INIT ERROR:", initError);
+  }
+
+  return app;
 }
 
 export default function handler(req: any, res: any) {
-  if (initError) {
+  const expressApp = getApp();
+  if (!expressApp) {
     return res.status(500).json({ error: "Init failed", details: initError });
   }
-  return app(req, res);
+  return expressApp(req, res);
 }
