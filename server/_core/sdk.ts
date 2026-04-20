@@ -2,7 +2,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const";
 import { ForbiddenError } from "../../shared/_core/errors";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
-import { SignJWT, jwtVerify } from "jose";
+import { signJwtHS256, verifyJwtHS256 } from "./jwt";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
@@ -41,10 +41,11 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
 export async function createSessionToken(userId: number, email: string): Promise<string> {
   const expirationSeconds = Math.floor((Date.now() + ONE_YEAR_MS) / 1000);
-  return new SignJWT({ userId, email })
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setExpirationTime(expirationSeconds)
-    .sign(getSecretKey());
+  return signJwtHS256(
+    { userId, email },
+    getSecretKey(),
+    { expirationTimeSeconds: expirationSeconds }
+  );
 }
 
 function parseCookies(cookieHeader: string | undefined) {
@@ -59,7 +60,7 @@ export async function authenticateRequest(req: Request): Promise<User> {
   if (!sessionCookie) throw ForbiddenError("No session cookie");
 
   try {
-    const { payload } = await jwtVerify(sessionCookie, getSecretKey(), { algorithms: ["HS256"] });
+    const { payload } = await verifyJwtHS256(sessionCookie, getSecretKey());
     const { userId } = payload as { userId: number; email: string };
 
     const user = await db.getUserById(userId);

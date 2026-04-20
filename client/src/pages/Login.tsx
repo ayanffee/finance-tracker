@@ -16,8 +16,9 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
-  const onSuccess = () => {
-    utils.auth.me.invalidate();
+  const onSuccess = (data: { id: number; email: string; name: string | null; role: string }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    utils.auth.me.setData(undefined, data as any);
     setLocation("/");
   };
 

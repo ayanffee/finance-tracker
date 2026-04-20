@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import express from "express";
-import { SignJWT, jwtVerify } from "jose";
+import { signJwtHS256, verifyJwtHS256 } from "./jwt";
 import { ENV } from "./env";
 import { exchangeCodeForTokens, getGmailEmail } from "../gmail";
 import { verifyWebhookSignature } from "../paystack";
@@ -12,15 +12,17 @@ function getSecretKey() {
 
 // Build a signed JWT state so we know which userId is completing the OAuth flow
 export async function buildOAuthState(userId: number): Promise<string> {
-  return new SignJWT({ userId })
-    .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("10m")
-    .sign(getSecretKey());
+  const tenMinutesFromNow = Math.floor(Date.now() / 1000) + 10 * 60;
+  return signJwtHS256(
+    { userId },
+    getSecretKey(),
+    { expirationTimeSeconds: tenMinutesFromNow }
+  );
 }
 
 export async function verifyOAuthState(state: string): Promise<number | null> {
   try {
-    const { payload } = await jwtVerify(state, getSecretKey());
+    const { payload } = await verifyJwtHS256(state, getSecretKey());
     return typeof payload.userId === "number" ? payload.userId : null;
   } catch {
     return null;
