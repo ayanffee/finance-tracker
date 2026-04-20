@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "installCommand": "npm install --legacy-peer-deps",
+  "installCommand": "corepack enable && pnpm install --no-frozen-lockfile",
   "buildCommand": "npx vite build",
   "outputDirectory": "dist/public",
   "rewrites": [
