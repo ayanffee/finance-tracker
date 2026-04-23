@@ -1,32 +1,36 @@
-import express from "express";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { appRouter } from "../server/routers";
-import { createContext } from "../server/_core/context";
-import { registerOAuthRoutes, registerPaystackWebhook } from "../server/_core/oauth";
-import { apiRateLimit } from "../server/_core/rateLimit";
+// .cts forces CommonJS output from @vercel/node. We use require() (not
+// import) so the deep relative paths into ../server/* resolve via Node's
+// CJS resolver (which auto-adds .js extensions).
+//
+// Every load is wrapped so that any failure surfaces as JSON instead of
+// Vercel's opaque FUNCTION_INVOCATION_FAILED HTML page.
 
-let app: ReturnType<typeof express> | null = null;
+/* eslint-disable @typescript-eslint/no-var-requires */
+
+let app: any = null;
 let initError: string | null = null;
 
-function getApp() {
+function getApp(): any {
   if (app) return app;
   if (initError) return null;
 
   try {
-    const _app = express();
+    const express = require("express");
+    const { createExpressMiddleware } = require("@trpc/server/adapters/express");
+    const { appRouter } = require("../server/routers");
+    const { createContext } = require("../server/_core/context");
+    const { registerOAuthRoutes, registerPaystackWebhook } = require("../server/_core/oauth");
+    const { apiRateLimit } = require("../server/_core/rateLimit");
 
+    const _app = express();
     registerPaystackWebhook(_app);
     _app.use(express.json({ limit: "5mb" }));
     _app.use(express.urlencoded({ limit: "5mb", extended: true }));
     _app.use(apiRateLimit);
     registerOAuthRoutes(_app);
-
     _app.use(
       "/api/trpc",
-      createExpressMiddleware({
-        router: appRouter,
-        createContext,
-      }),
+      createExpressMiddleware({ router: appRouter, createContext }),
     );
 
     app = _app;
@@ -45,10 +49,7 @@ export default function handler(req: any, res: any) {
     res.setHeader("content-type", "application/json");
     res.statusCode = 500;
     res.end(
-      JSON.stringify({
-        error: "API init failed",
-        details: initError ?? "unknown",
-      }),
+      JSON.stringify({ error: "API init failed", details: initError ?? "unknown" }),
     );
     return;
   }
