@@ -1,6 +1,4 @@
 {
   "name": "finance-tracker-api",
-  "private": true,
-  "version": "0.0.0",
-  "type": "commonjs"
+  "version": "0.0.0"
 }
