@@ -9,7 +9,10 @@ import path from "node:path";
 fs.mkdirSync("api", { recursive: true });
 
 await build({
-  entryPoints: ["server/apiHandler.ts"],
+  // Optional: run `node build-api.mjs` locally to smoke-test the Lambda bundle.
+  // Vercel deploys via @vercel/node compiling api/index.cts directly; this
+  // script is not part of the production build path.
+  entryPoints: ["api/index.cts"],
   bundle: true,
   platform: "node",
   target: "node20",
