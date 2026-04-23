@@ -1,9 +1,9 @@
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { appRouter } from "../server/routers";
-import { createContext } from "../server/_core/context";
-import { registerOAuthRoutes, registerPaystackWebhook } from "../server/_core/oauth";
-import { apiRateLimit } from "../server/_core/rateLimit";
+import { appRouter } from "./routers";
+import { createContext } from "./_core/context";
+import { registerOAuthRoutes, registerPaystackWebhook } from "./_core/oauth";
+import { apiRateLimit } from "./_core/rateLimit";
 
 let app: ReturnType<typeof express> | null = null;
 let initError: string | null = null;

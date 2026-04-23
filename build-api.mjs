@@ -1,40 +1,33 @@
+// Pre-bundle the /api Lambda so @vercel/node has one flat CJS file to serve.
+// This avoids the module-resolution gymnastics @vercel/node has been doing.
+
 import { build } from "esbuild";
+import fs from "node:fs";
+import path from "node:path";
+
+// Ensure target dir exists
+fs.mkdirSync("api", { recursive: true });
 
 await build({
-  entryPoints: ["api/_handler.ts"],
+  entryPoints: ["server/apiHandler.ts"],
   bundle: true,
   platform: "node",
-  target: "node18",
-  format: "esm",
+  target: "node20",
+  format: "cjs",
   outfile: "api/index.js",
-  // Bundle everything except Node.js builtins
+  sourcemap: false,
+  minify: false,
+  // Keep node built-ins external
   external: [
     "node:*",
-    "crypto",
-    "fs",
-    "path",
-    "http",
-    "https",
-    "net",
-    "tls",
-    "stream",
-    "url",
-    "util",
-    "events",
-    "buffer",
-    "querystring",
-    "string_decoder",
-    "zlib",
-    "os",
-    "child_process",
-    "worker_threads",
-    "diagnostics_channel",
-    "async_hooks",
-    "perf_hooks",
+    "crypto", "fs", "path", "http", "https", "net", "tls",
+    "stream", "url", "util", "events", "buffer", "querystring",
+    "string_decoder", "zlib", "os", "child_process",
+    "worker_threads", "diagnostics_channel", "async_hooks", "perf_hooks",
+    "dns", "assert", "module", "timers", "readline",
   ],
-  banner: {
-    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url);`,
-  },
+  // Silence noisy optional package imports that aren't actually used at runtime
+  logLevel: "warning",
 });
 
-console.log("✓ API bundled to api/index.js");
+console.log("[build-api] wrote api/index.js");
