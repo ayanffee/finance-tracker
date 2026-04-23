@@ -1,45 +1,53 @@
-import express from "express";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { appRouter } from "../server/routers";
-import { createContext } from "../server/_core/context";
-import { registerOAuthRoutes, registerPaystackWebhook } from "../server/_core/oauth";
-import { apiRateLimit } from "../server/_core/rateLimit";
+// Use dynamic imports so any module-load failure is captured in `initError`
+// and surfaced as JSON instead of crashing the Lambda with
+// FUNCTION_INVOCATION_FAILED + a Vercel HTML error page.
 
-let app: ReturnType<typeof express> | null = null;
+let app: any = null;
 let initError: string | null = null;
 
-function getApp() {
-  if (app) return app;
-  if (initError) return null;
-
+const initPromise = (async () => {
   try {
-    app = express();
+    const expressMod: any = await import("express");
+    const express = expressMod.default || expressMod;
+    const { createExpressMiddleware } = await import("@trpc/server/adapters/express");
+    const { appRouter } = await import("../server/routers");
+    const { createContext } = await import("../server/_core/context");
+    const { registerOAuthRoutes, registerPaystackWebhook } = await import("../server/_core/oauth");
+    const { apiRateLimit } = await import("../server/_core/rateLimit");
 
-    registerPaystackWebhook(app);
-    app.use(express.json({ limit: "5mb" }));
-    app.use(express.urlencoded({ limit: "5mb", extended: true }));
-    app.use(apiRateLimit);
-    registerOAuthRoutes(app);
-
-    app.use(
+    const _app = express();
+    registerPaystackWebhook(_app);
+    _app.use(express.json({ limit: "5mb" }));
+    _app.use(express.urlencoded({ limit: "5mb", extended: true }));
+    _app.use(apiRateLimit);
+    registerOAuthRoutes(_app);
+    _app.use(
       "/api/trpc",
       createExpressMiddleware({
         router: appRouter,
         createContext,
-      })
+      }),
     );
+    app = _app;
   } catch (err: any) {
     initError = err?.stack || err?.message || String(err);
-    console.error("INIT ERROR:", initError);
+    // eslint-disable-next-line no-console
+    console.error("API INIT ERROR:", initError);
+  }
+})();
+
+export default async function handler(req: any, res: any) {
+  try {
+    await initPromise;
+  } catch (err: any) {
+    initError = initError || err?.stack || err?.message || String(err);
   }
 
-  return app;
-}
-
-export default function handler(req: any, res: any) {
-  const expressApp = getApp();
-  if (!expressApp) {
-    return res.status(500).json({ error: "Init failed", details: initError });
+  if (!app) {
+    res.setHeader("content-type", "application/json");
+    return res.status(500).end(
+      JSON.stringify({ error: "API init failed", details: initError ?? "unknown" }),
+    );
   }
-  return expressApp(req, res);
+  return app(req, res);
 }
