@@ -1,47 +1,31 @@
-import { trpc } from "@/lib/trpc";
-import { TRPCClientError } from "@trpc/client";
+// Auth is bypassed — the app runs entirely client-side (demo mode) against
+// localStorage-backed data. useAuth returns a stub guest user so the
+// DashboardLayout renders and any user-dependent UI has something to read.
+// No tRPC calls, no server round-trips.
+
 import { useCallback, useMemo } from "react";
 
+const GUEST_USER = {
+  id: 0,
+  email: "guest@local",
+  name: "Guest",
+  role: "user",
+} as const;
+
 export function useAuth() {
-  const utils = trpc.useUtils();
-
-  const meQuery = trpc.auth.me.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => {
-      utils.auth.me.setData(undefined, null);
-    },
-  });
-
   const logout = useCallback(async () => {
-    try {
-      await logoutMutation.mutateAsync();
-    } catch (error: unknown) {
-      if (error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED") return;
-      throw error;
-    } finally {
-      utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
-    }
-  }, [logoutMutation, utils]);
+    // No server session to clear — just a no-op.
+  }, []);
 
-  return useMemo(() => ({
-    user: meQuery.data ?? null,
-    loading: meQuery.isLoading || logoutMutation.isPending,
-    error: meQuery.error ?? logoutMutation.error ?? null,
-    isAuthenticated: Boolean(meQuery.data),
-    refresh: () => meQuery.refetch(),
-    logout,
-  }), [
-    meQuery.data,
-    meQuery.error,
-    meQuery.isLoading,
-    logoutMutation.error,
-    logoutMutation.isPending,
-    logout,
-    meQuery,
-  ]);
+  return useMemo(
+    () => ({
+      user: GUEST_USER,
+      loading: false,
+      error: null,
+      isAuthenticated: true,
+      refresh: () => Promise.resolve(),
+      logout,
+    }),
+    [logout],
+  );
 }

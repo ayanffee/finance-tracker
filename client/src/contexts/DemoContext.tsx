@@ -11,7 +11,9 @@ const DemoContext = createContext<DemoContextType>({
 });
 
 export function DemoProvider({ children }: { children: React.ReactNode }) {
-  const [isDemoMode, setDemoMode] = useState(false);
+  // Default ON: app runs entirely client-side against demoData (localStorage).
+  // No server auth, no tRPC round-trips — the login UI is bypassed entirely.
+  const [isDemoMode, setDemoMode] = useState(true);
   return (
     <DemoContext.Provider value={{ isDemoMode, setDemoMode }}>
       {children}
