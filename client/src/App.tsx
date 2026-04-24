@@ -16,33 +16,14 @@ import AutoImport from "./pages/AutoImport";
 import Billing from "./pages/Billing";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
-import { useAuth } from "./_core/hooks/useAuth";
-import { Loader2 } from "lucide-react";
 
 function Router() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <Switch>
-        <Route path="/login" component={Login} />
-        <Route path="/" component={Landing} />
-        <Route component={Landing} />
-      </Switch>
-    );
-  }
-
+  // Auth gate temporarily removed — land straight in the app.
+  // Landing / Login pages still reachable via their explicit paths.
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/landing" component={Landing} />
       <Route path="/" component={() => <DashboardLayout><Dashboard /></DashboardLayout>} />
       <Route path="/transactions" component={() => <DashboardLayout><Transactions /></DashboardLayout>} />
       <Route path="/wishlist" component={() => <DashboardLayout><Wishlist /></DashboardLayout>} />
