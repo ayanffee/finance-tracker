@@ -6,3 +6,4 @@ dist/
 .vercel
 api/index.mjs
 api/index.js
+push-fix.command
