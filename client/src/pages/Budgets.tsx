@@ -13,7 +13,7 @@ import { useDemoData } from "@/hooks/useDemoData";
 
 export default function Budgets() {
   const { isDemoMode } = useDemo();
-  const { demoData } = useDemoData();
+  const { demoData, saveDemoData } = useDemoData();
   const { data: _budgets = [], refetch } = trpc.budgets.list.useQuery(undefined, { enabled: !isDemoMode });
   const { data: _categories = [] } = trpc.categories.list.useQuery(undefined, { enabled: !isDemoMode });
   const { data: _transactions = [] } = trpc.transactions.list.useQuery(undefined, { enabled: !isDemoMode });
@@ -33,14 +33,25 @@ export default function Budgets() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isDemoMode) {
-      toast.info('Sign in to create budgets');
-      setOpen(false);
+    if (!formData.categoryId || !formData.monthlyLimit) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
-    if (!formData.categoryId || !formData.monthlyLimit) {
-      toast.error('Please fill in all required fields');
+    if (isDemoMode) {
+      const newBudget = {
+        id: Date.now(),
+        userId: 999,
+        categoryId: parseInt(formData.categoryId),
+        monthlyLimit: formData.monthlyLimit,
+        alertThreshold: parseInt(formData.alertThreshold),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      saveDemoData({ ...demoData, budgets: [...demoData.budgets, newBudget as any] });
+      toast.success('Budget created successfully');
+      setFormData({ categoryId: '', monthlyLimit: '', alertThreshold: '80' });
+      setOpen(false);
       return;
     }
 
@@ -66,7 +77,8 @@ export default function Budgets() {
 
   const handleDelete = async (id: number) => {
     if (isDemoMode) {
-      toast.info('Sign in to delete budgets');
+      saveDemoData({ ...demoData, budgets: demoData.budgets.filter(b => b.id !== id) });
+      toast.success('Budget deleted');
       return;
     }
     try {

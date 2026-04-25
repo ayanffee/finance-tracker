@@ -14,7 +14,7 @@ import { useDemoData } from "@/hooks/useDemoData";
 
 export default function Wishlist() {
   const { isDemoMode } = useDemo();
-  const { demoData } = useDemoData();
+  const { demoData, saveDemoData } = useDemoData();
   const { data: _wishlistItems = [], refetch } = trpc.wishlist.list.useQuery(undefined, { enabled: !isDemoMode });
   const { data: _transactions = [] } = trpc.transactions.list.useQuery(undefined, { enabled: !isDemoMode });
   const wishlistItems = isDemoMode ? demoData.wishlist : _wishlistItems;
@@ -35,14 +35,28 @@ export default function Wishlist() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isDemoMode) {
-      toast.info('Sign in to save wishlist items');
-      setOpen(false);
+    if (!formData.name || !formData.estimatedPrice) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
-    if (!formData.name || !formData.estimatedPrice) {
-      toast.error('Please fill in all required fields');
+    if (isDemoMode) {
+      const newItem = {
+        id: Date.now(),
+        userId: 999,
+        name: formData.name,
+        estimatedPrice: formData.estimatedPrice,
+        priority: formData.priority,
+        description: formData.description || null,
+        targetDate: formData.targetDate ? new Date(formData.targetDate) : null,
+        purchased: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      saveDemoData({ ...demoData, wishlist: [...demoData.wishlist, newItem as any] });
+      toast.success('Wishlist item added');
+      setFormData({ name: '', estimatedPrice: '', priority: 'medium', description: '', targetDate: '' });
+      setOpen(false);
       return;
     }
 
@@ -72,7 +86,10 @@ export default function Wishlist() {
 
   const handleTogglePurchased = async (item: any) => {
     if (isDemoMode) {
-      toast.info('Sign in to update wishlist items');
+      const updated = demoData.wishlist.map(w =>
+        w.id === item.id ? { ...w, purchased: !w.purchased, updatedAt: new Date() } : w,
+      );
+      saveDemoData({ ...demoData, wishlist: updated });
       return;
     }
     try {
@@ -88,7 +105,8 @@ export default function Wishlist() {
 
   const handleDelete = async (id: number) => {
     if (isDemoMode) {
-      toast.info('Sign in to delete wishlist items');
+      saveDemoData({ ...demoData, wishlist: demoData.wishlist.filter(w => w.id !== id) });
+      toast.success('Item deleted');
       return;
     }
     try {

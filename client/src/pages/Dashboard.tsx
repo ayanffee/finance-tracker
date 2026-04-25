@@ -183,57 +183,59 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* AI Monthly Insights */}
-      <Card className="border-purple-200 dark:border-purple-800">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-500" />
-              <div>
-                <CardTitle className="text-base">AI Monthly Report</CardTitle>
-                <CardDescription>AI rates your finances 1–10 based on budget adherence, savings rate, and goal progress</CardDescription>
+      {/* AI Monthly Insights — needs server-side Anthropic call, hidden in demo */}
+      {!isDemoMode && (
+        <Card className="border-purple-200 dark:border-purple-800">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-purple-500" />
+                <div>
+                  <CardTitle className="text-base">AI Monthly Report</CardTitle>
+                  <CardDescription>AI rates your finances 1–10 based on budget adherence, savings rate, and goal progress</CardDescription>
+                </div>
               </div>
+              {user && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateInsights}
+                  disabled={loadingInsights}
+                  className="shrink-0"
+                >
+                  {loadingInsights ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  {insights ? "Refresh" : "Generate"}
+                </Button>
+              )}
             </div>
-            {user && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleGenerateInsights}
-                disabled={loadingInsights}
-                className="shrink-0"
-              >
-                {loadingInsights ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                )}
-                {insights ? "Refresh" : "Generate"}
-              </Button>
+          </CardHeader>
+          <CardContent>
+            {!user ? (
+              <p className="text-sm text-muted-foreground">Sign in to generate AI insights.</p>
+            ) : loadingInsights ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Analyzing your complete financial profile...
+              </div>
+            ) : insights ? (
+              <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
+                <Streamdown>{insights}</Streamdown>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Click <strong>Generate</strong> to get a personalized financial report.
+              </p>
             )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {!user && !isDemoMode ? (
-            <p className="text-sm text-muted-foreground">Sign in to generate AI insights.</p>
-          ) : loadingInsights ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Analyzing your complete financial profile...
-            </div>
-          ) : insights ? (
-            <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
-              <Streamdown>{insights}</Streamdown>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Click <strong>Generate</strong> to get a personalized financial report. AI will score your finances from 1–10 (based on how well you're sticking to budgets, your savings rate, and goal progress), flag any overspending alerts, and give you one clear action to take this month.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Month-over-Month Habit Trend */}
-      {snapshotsData.length >= 2 && (
+      {!isDemoMode && snapshotsData.length >= 2 && (
         <Card className="border-green-200 dark:border-green-800">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">

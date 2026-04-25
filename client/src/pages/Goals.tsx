@@ -5,46 +5,50 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2, Target, Sparkles, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Target } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Streamdown } from "streamdown";
 import { useDemo } from "@/contexts/DemoContext";
 import { useDemoData } from "@/hooks/useDemoData";
-import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function Goals() {
-  const { user } = useAuth();
   const { isDemoMode } = useDemo();
-  const { demoData } = useDemoData();
+  const { demoData, saveDemoData } = useDemoData();
   const { data: _goals = [], refetch } = trpc.goals.list.useQuery(undefined, { enabled: !isDemoMode });
   const goals = isDemoMode ? demoData.goals : _goals;
   const createMutation = trpc.goals.create.useMutation();
   const updateMutation = trpc.goals.update.useMutation();
   const deleteMutation = trpc.goals.delete.useMutation();
-  const goalPlanMutation = trpc.assistant.goalPlan.useMutation();
 
   const [open, setOpen] = useState(false);
   const [contributingGoal, setContributingGoal] = useState<{ id: number; name: string } | null>(null);
   const [contributeAmount, setContributeAmount] = useState("");
   const [formData, setFormData] = useState({ name: "", targetAmount: "", targetDate: "", description: "" });
 
-  // Per-goal AI plan state
-  const [planGoalId, setPlanGoalId] = useState<number | null>(null);
-  const [plans, setPlans] = useState<Record<number, string>>({});
-  const [loadingPlanId, setLoadingPlanId] = useState<number | null>(null);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isDemoMode) {
-      toast.info("Sign in to create goals");
-      setOpen(false);
+    if (!formData.name || !formData.targetAmount || !formData.targetDate) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
-    if (!formData.name || !formData.targetAmount || !formData.targetDate) {
-      toast.error("Please fill in all required fields");
+    if (isDemoMode) {
+      const newGoal = {
+        id: Date.now(),
+        userId: 999,
+        name: formData.name,
+        targetAmount: formData.targetAmount,
+        currentAmount: "0",
+        targetDate: new Date(formData.targetDate),
+        description: formData.description || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      saveDemoData({ ...demoData, goals: [...demoData.goals, newGoal as any] });
+      toast.success("Goal created!");
+      setFormData({ name: "", targetAmount: "", targetDate: "", description: "" });
+      setOpen(false);
       return;
     }
 
@@ -55,7 +59,6 @@ export default function Goals() {
         targetDate: new Date(formData.targetDate),
         description: formData.description || undefined,
       });
-
       toast.success("Goal created!");
       setFormData({ name: "", targetAmount: "", targetDate: "", description: "" });
       setOpen(false);
@@ -67,17 +70,22 @@ export default function Goals() {
 
   const handleContribute = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isDemoMode) {
-      toast.info("Sign in to track contributions");
-      setContributingGoal(null);
-      return;
-    }
     if (!contributingGoal || !contributeAmount) return;
 
     const goal = goals.find(g => g.id === contributingGoal.id);
     if (!goal) return;
-
     const newAmount = (parseFloat(goal.currentAmount ?? "0") + parseFloat(contributeAmount)).toFixed(2);
+
+    if (isDemoMode) {
+      const updatedGoals = demoData.goals.map(g =>
+        g.id === contributingGoal.id ? { ...g, currentAmount: newAmount, updatedAt: new Date() } : g,
+      );
+      saveDemoData({ ...demoData, goals: updatedGoals });
+      toast.success("Contribution added!");
+      setContributingGoal(null);
+      setContributeAmount("");
+      return;
+    }
 
     try {
       await updateMutation.mutateAsync({ id: contributingGoal.id, currentAmount: newAmount });
@@ -92,7 +100,8 @@ export default function Goals() {
 
   const handleDelete = async (id: number) => {
     if (isDemoMode) {
-      toast.info("Sign in to delete goals");
+      saveDemoData({ ...demoData, goals: demoData.goals.filter(g => g.id !== id) });
+      toast.success("Goal deleted");
       return;
     }
     try {
@@ -101,34 +110,6 @@ export default function Goals() {
       refetch();
     } catch {
       toast.error("Failed to delete goal");
-    }
-  };
-
-  const handleGetPlan = async (goalId: number) => {
-    if (!user) {
-      toast.info("Sign in to get an AI savings plan");
-      return;
-    }
-    // Toggle off if already showing
-    if (planGoalId === goalId) {
-      setPlanGoalId(null);
-      return;
-    }
-
-    setPlanGoalId(goalId);
-
-    // Use cached plan if available
-    if (plans[goalId]) return;
-
-    setLoadingPlanId(goalId);
-    try {
-      const result = await goalPlanMutation.mutateAsync({ goalId });
-      setPlans(prev => ({ ...prev, [goalId]: result.content }));
-    } catch {
-      toast.error("Failed to generate plan");
-      setPlanGoalId(null);
-    } finally {
-      setLoadingPlanId(null);
     }
   };
 
@@ -237,7 +218,6 @@ export default function Goals() {
             const percentage = Math.min((current / target) * 100, 100);
             const isComplete = percentage >= 100;
             const daysLeft = Math.ceil((new Date(goal.targetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-            const showPlan = planGoalId === goal.id;
 
             return (
               <Card key={goal.id} className={isComplete ? "border-green-500 bg-green-50 dark:bg-green-950" : ""}>
@@ -251,23 +231,6 @@ export default function Goals() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {!isComplete && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleGetPlan(goal.id)}
-                          disabled={loadingPlanId === goal.id}
-                          className="text-purple-600 border-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950"
-                        >
-                          {loadingPlanId === goal.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                          ) : (
-                            <Sparkles className="h-3 w-3 mr-1" />
-                          )}
-                          AI Plan
-                          {showPlan && plans[goal.id] ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
-                        </Button>
-                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -318,22 +281,6 @@ export default function Goals() {
                       </span>
                     )}
                   </div>
-
-                  {/* AI Plan Panel */}
-                  {showPlan && (
-                    <div className="mt-3 p-3 rounded-lg border border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950">
-                      {loadingPlanId === goal.id ? (
-                        <div className="flex items-center gap-2 text-sm text-purple-700 dark:text-purple-300">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Generating your personalized savings plan...
-                        </div>
-                      ) : plans[goal.id] ? (
-                        <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-headings:text-purple-800 dark:prose-headings:text-purple-200">
-                          <Streamdown>{plans[goal.id]}</Streamdown>
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             );

@@ -14,7 +14,7 @@ import { useDemoData } from "@/hooks/useDemoData";
 
 export default function Recurring() {
   const { isDemoMode } = useDemo();
-  const { demoData } = useDemoData();
+  const { demoData, saveDemoData } = useDemoData();
   const { data: _recurring = [], refetch } = trpc.recurring.list.useQuery(undefined, { enabled: !isDemoMode });
   const { data: _categories = [] } = trpc.categories.list.useQuery(undefined, { enabled: !isDemoMode });
   const recurring = isDemoMode ? demoData.recurring : _recurring;
@@ -36,14 +36,37 @@ export default function Recurring() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isDemoMode) {
-      toast.info('Sign in to create recurring transactions');
-      setOpen(false);
+    if (!formData.categoryId || !formData.amount) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
-    if (!formData.categoryId || !formData.amount) {
-      toast.error('Please fill in all required fields');
+    if (isDemoMode) {
+      const newRecurring = {
+        id: Date.now(),
+        userId: 999,
+        categoryId: parseInt(formData.categoryId),
+        type: formData.type,
+        amount: formData.amount,
+        frequency: formData.frequency,
+        nextOccurrence: new Date(formData.nextOccurrence),
+        lastOccurrence: null,
+        description: formData.description || null,
+        active: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      saveDemoData({ ...demoData, recurring: [...demoData.recurring, newRecurring as any] });
+      toast.success('Recurring transaction created');
+      setFormData({
+        type: 'expense',
+        categoryId: '',
+        amount: '',
+        frequency: 'monthly',
+        nextOccurrence: new Date().toISOString().split('T')[0],
+        description: '',
+      });
+      setOpen(false);
       return;
     }
 
@@ -75,7 +98,10 @@ export default function Recurring() {
 
   const handleToggleActive = async (item: any) => {
     if (isDemoMode) {
-      toast.info('Sign in to manage recurring transactions');
+      const updated = demoData.recurring.map(r =>
+        r.id === item.id ? { ...r, active: !r.active, updatedAt: new Date() } : r,
+      );
+      saveDemoData({ ...demoData, recurring: updated });
       return;
     }
     try {
@@ -91,7 +117,8 @@ export default function Recurring() {
 
   const handleDelete = async (id: number) => {
     if (isDemoMode) {
-      toast.info('Sign in to delete recurring transactions');
+      saveDemoData({ ...demoData, recurring: demoData.recurring.filter(r => r.id !== id) });
+      toast.success('Recurring transaction deleted');
       return;
     }
     try {

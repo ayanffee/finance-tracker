@@ -18,7 +18,7 @@ import CsvUpload from "@/components/CsvUpload";
 export default function Transactions() {
   const { user } = useAuth();
   const { isDemoMode } = useDemo();
-  const { demoData } = useDemoData();
+  const { demoData, saveDemoData } = useDemoData();
   const { data: _transactions = [], refetch } = trpc.transactions.list.useQuery(undefined, { enabled: !isDemoMode });
   const { data: _categories = [] } = trpc.categories.list.useQuery(undefined, { enabled: !isDemoMode });
   const transactions = isDemoMode ? demoData.transactions : _transactions;
@@ -66,8 +66,10 @@ export default function Transactions() {
     setFormData(prev => ({ ...prev, description: value }));
     setSuggestedCategory(null);
 
-    // Only auto-suggest for new transactions when signed in
-    if (!user || editingTransaction || value.length < 3) return;
+    // AI auto-suggest needs the server-side Anthropic call. While the
+    // backend is offline (demo mode), skip the round-trip entirely so we
+    // don't surface 500 errors on every keystroke.
+    if (isDemoMode || !user || editingTransaction || value.length < 3) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
@@ -78,7 +80,6 @@ export default function Transactions() {
           type: formData.type as "income" | "expense",
         });
         if (result.categoryName && result.categoryId) {
-          // Only suggest if user hasn't already picked a category
           setSuggestedCategory({ name: result.categoryName, id: result.categoryId });
         }
       } catch {
@@ -98,14 +99,47 @@ export default function Transactions() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isDemoMode) {
-      toast.info("Sign in to save transactions");
-      setOpen(false);
+    if (!formData.categoryId || !formData.amount) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
-    if (!formData.categoryId || !formData.amount) {
-      toast.error("Please fill in all required fields");
+    if (isDemoMode) {
+      if (editingTransaction) {
+        const updated = demoData.transactions.map(t =>
+          t.id === editingTransaction.id
+            ? {
+                ...t,
+                categoryId: parseInt(formData.categoryId),
+                amount: formData.amount,
+                date: new Date(formData.date),
+                description: formData.description || null,
+                updatedAt: new Date(),
+              }
+            : t,
+        );
+        saveDemoData({ ...demoData, transactions: updated as any });
+        toast.success("Transaction updated");
+      } else {
+        const newTx = {
+          id: Date.now(),
+          userId: 999,
+          categoryId: parseInt(formData.categoryId),
+          type: formData.type,
+          amount: formData.amount,
+          date: new Date(formData.date),
+          description: formData.description || null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        saveDemoData({
+          ...demoData,
+          transactions: [newTx as any, ...demoData.transactions],
+        });
+        toast.success("Transaction added successfully");
+      }
+      resetForm();
+      setOpen(false);
       return;
     }
 
@@ -140,7 +174,11 @@ export default function Transactions() {
 
   const handleDelete = async (id: number) => {
     if (isDemoMode) {
-      toast.info("Sign in to delete transactions");
+      saveDemoData({
+        ...demoData,
+        transactions: demoData.transactions.filter(t => t.id !== id),
+      });
+      toast.success("Transaction deleted");
       return;
     }
     try {
